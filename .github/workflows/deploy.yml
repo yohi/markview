@@ -23,8 +23,8 @@ jobs:
         github.event.workflow_run.head_branch == 'master' &&
         github.event.workflow_run.head_repository.full_name == github.repository
       }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
     environment: production
     steps:
       - name: Checkout CI-verified revision
