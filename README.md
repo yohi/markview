@@ -25,16 +25,36 @@ npm run preview
 
 ## Cloudflare Workers Static Assets
 
-The repository includes `wrangler.jsonc` for a static-only deployment. Nothing has been deployed by this repository.
+The repository includes `wrangler.jsonc` for a static-only Workers deployment.
 
-After explicit deployment approval, run:
+### GitHub Actions deployment
+
+- `.github/workflows/ci.yml` runs tests, TypeScript checks and a production build on pushes and pull requests.
+- `.github/workflows/deploy.yml` runs **only after CI succeeds on a trusted push to `master`**. PR or feature-branch CI cannot deploy. It checks that the CI-tested commit is still the current `master` HEAD before deploying.
+- The deployment workflow must first exist on the default branch. Merely committing it to a feature branch does not deploy anything.
+- The deploy job uses the GitHub `production` environment. You can configure its required reviewers as an approval gate in GitHub Settings before merging.
+- Do **not** also enable Cloudflare Workers Builds Git integration for automatic deployment of the same Worker; that would create a second deployment path.
+
+Configure these at `GitHub → yohi/markview → Settings → Secrets and variables → Actions`:
+
+| Type | Name | Value |
+| --- | --- | --- |
+| Repository secret | `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers edit permissions for the intended account |
+| Repository variable | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID (not Zone ID) |
+
+Create the token in Cloudflare Dashboard → Account API Tokens → Create Token → **Edit Cloudflare Workers**. Restrict its resources to the intended account; custom-domain routes need separately checked permissions. Never commit or paste the token into a file. If you prefer environment-scoped configuration, use the same names under the GitHub `production` environment.
+
+**When you merge this workflow into `master`**, a subsequent successful `master` CI push may trigger the first deployment automatically if credentials and any environment approvals are in place. Do not merge until that behavior is desired.
+
+Manual deployment remains available after separate approval:
 
 ~~~bash
+npm install
 npm run build
 npx wrangler deploy
 ~~~
 
-The GitHub Actions workflow runs tests and a production build on commits. It does **not** deploy.
+The deploy workflow currently uses `npm install` because no lockfile exists; creating and committing a `package-lock.json` would allow switching CI and deploy to `npm ci`.
 
 ## Markdown and security
 
@@ -46,4 +66,4 @@ The GitHub Actions workflow runs tests and a production build on commits. It doe
 
 ## Current scope
 
-This is an MVP: no document saving, autosave, cloud sync, authentication, AI calls, server functions or deployment automation. GitHub-specific extensions outside standard GFM (such as GitHub Alerts) are not guaranteed.
+This is an MVP: no document saving, autosave, cloud sync, authentication, AI calls, server functions or cloud synchronization. GitHub-specific extensions outside standard GFM (such as GitHub Alerts) are not guaranteed.
