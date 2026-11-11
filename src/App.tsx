@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import MarkdownEditor from './components/MarkdownEditor';
 import MarkdownPreview from './components/MarkdownPreview';
 import SplitLayout from './components/SplitLayout';
@@ -13,6 +13,8 @@ export default function App() {
   const [mode, setMode] = useState<ViewMode>('split');
   const [theme, setTheme] = useState<ColorTheme>(getSystemTheme);
   const [notice, setNotice] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const workspaceRef = useRef<HTMLDivElement>(null);
   const deferredMarkdown = useDeferredValue(markdown);
 
   useEffect(() => {
@@ -20,6 +22,34 @@ export default function App() {
     const timeout = window.setTimeout(() => setNotice(''), 3500);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+
+  useEffect(() => {
+    // Escape/browser controls can leave fullscreen without clicking our button.
+    const syncFullscreen = () => {
+      setIsFullscreen(document.fullscreenElement === workspaceRef.current);
+    };
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    syncFullscreen();
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+    try {
+      if (document.fullscreenElement === workspace) {
+        await document.exitFullscreen();
+      } else if (document.fullscreenElement) {
+        setNotice('Exit the current fullscreen view before entering MarkView fullscreen.');
+      } else if (typeof workspace.requestFullscreen === 'function') {
+        await workspace.requestFullscreen();
+      } else {
+        setNotice('Fullscreen is not supported in this browser.');
+      }
+    } catch {
+      setNotice('Could not change fullscreen mode.');
+    }
+  };
 
   const copyRaw = async () => {
     try {
@@ -60,6 +90,7 @@ export default function App() {
           <div className="topline-tag">GFM <span>+</span> MERMAID</div>
         </div>
 
+        <div className="workspace-shell" ref={workspaceRef}>
         <div className="toolbar">
           <div className="mode-switch" role="group" aria-label="View mode">
             {(['editor', 'split', 'preview'] as const).map((item) => (
@@ -69,6 +100,17 @@ export default function App() {
             ))}
           </div>
           <div className="toolbar-actions">
+            <button
+              type="button"
+              className="button subtle-button fullscreen-button"
+              onClick={() => void toggleFullscreen()}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              aria-pressed={isFullscreen}
+              title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Enter fullscreen'}
+            >
+              <span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span>
+              <span>{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
+            </button>
             <button type="button" className="button subtle-button" onClick={clearMarkdown} disabled={!markdown}>Clear</button>
             <button type="button" className="button primary-button" onClick={() => void copyRaw()} title="Copy original Markdown as plain text">⧉ <span>Copy Raw</span></button>
           </div>
@@ -84,6 +126,7 @@ export default function App() {
           )}
         </div>
         <footer className="app-footer"><span>Markdown stays in this tab's memory.</span><span>{markdown.length.toLocaleString()} characters <span className="footer-separator">·</span> {markdown ? markdown.trim().split(/\s+/).length.toLocaleString() : 0} words</span></footer>
+        </div>
       </main>
       {notice && <div className="toast" role="status">{notice}</div>}
     </div>

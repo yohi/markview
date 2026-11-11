@@ -9,6 +9,7 @@ A lightweight, temporary Markdown workspace with GitHub Flavored Markdown, Merma
 - Mermaid fenced blocks (rendered in-browser with strict security mode)
 - One-click **Copy Raw** — copies the original Markdown, not the rendered preview
 - Light / dark themes and responsive layout
+- Larger edge-to-edge workspace and a **Fullscreen** toolbar button (browser fullscreen, with Esc to exit) that retains mode switching and Raw Copy
 - **No saving, accounts or backend.** Content stays in React memory only and is lost on refresh or closing the tab
 
 ## Local development
