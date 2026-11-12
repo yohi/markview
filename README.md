@@ -10,6 +10,8 @@ A lightweight, temporary Markdown workspace with GitHub Flavored Markdown, Merma
 - One-click **Copy Raw** — copies the original Markdown, not the rendered preview
 - Light / dark themes and responsive layout
 - Larger edge-to-edge workspace and a **Fullscreen** toolbar button (browser fullscreen, with Esc to exit) that retains mode switching and Raw Copy
+- **Maximize** fills the browser tab's available viewport without hiding browser tabs; **Restore** returns to the normal layout
+- Click GFM task checkboxes in Preview to toggle them; the corresponding `[ ]` / `[x]` in the in-memory Markdown source updates immediately, including in Split mode
 - **No saving, accounts or backend.** Content stays in React memory only and is lost on refresh or closing the tab
 
 ## Local development
@@ -68,3 +70,7 @@ The deploy workflow currently uses `npm install` because no lockfile exists; cre
 ## Current scope
 
 This is an MVP: no document saving, autosave, cloud sync, authentication, AI calls, server functions or cloud synchronization. GitHub-specific extensions outside standard GFM (such as GitHub Alerts) are not guaranteed.
+
+### Preview task editing
+
+Only checkboxes generated from GFM list items are interactive. The renderer uses the original list-item source position to update exactly one Markdown checkbox marker. If the source has changed since that preview was rendered, an outdated click does not apply. No changes are persisted beyond the current tab. Maximize and browser Fullscreen are independent modes.

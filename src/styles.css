@@ -59,3 +59,50 @@
   .workspace-shell:fullscreen{padding:8px}
   .workspace-shell:fullscreen .workspace-frame{height:auto;min-height:0}
 }
+
+
+/* Maximize the workspace within the browser viewport (browser tabs remain visible).
+   This is intentionally distinct from the browser Fullscreen API. */
+.maximize-button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.app[data-maximized="true"]{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100dvh;
+  min-height:0;
+  z-index:40;
+  overflow:hidden;
+}
+.app[data-maximized="true"] .app-header,
+.app[data-maximized="true"] .workspace-topline{display:none}
+.app[data-maximized="true"] .app-main{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  height:100%;
+  max-width:none;
+  min-height:0;
+  padding:8px;
+}
+.app[data-maximized="true"] .workspace-shell{
+  display:flex;
+  flex:1 1 auto;
+  flex-direction:column;
+  min-height:0;
+  min-width:0;
+}
+.app[data-maximized="true"] .toolbar{flex:none}
+.app[data-maximized="true"] .workspace-frame{
+  flex:1 1 auto;
+  height:auto;
+  min-height:0;
+}
+.app[data-maximized="true"] .split-layout,
+.app[data-maximized="true"] .single-pane{height:100%;min-height:0}
+.app[data-maximized="true"] .app-footer{flex:none}
+.app .markdown-body input[type="checkbox"]:not(:disabled){cursor:pointer}
+@media(max-width:760px){
+  .maximize-button span:last-child{display:none}
+  .app[data-maximized="true"] .app-main{padding:5px}
+  .app[data-maximized="true"] .workspace-frame{height:auto;min-height:0}
+}
