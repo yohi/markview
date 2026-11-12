@@ -1,7 +1,8 @@
-import { useDeferredValue, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import MarkdownEditor from './components/MarkdownEditor';
 import MarkdownPreview from './components/MarkdownPreview';
 import SplitLayout from './components/SplitLayout';
+import { setTaskChecked } from './lib/task-checkbox';
 import type { ColorTheme, ViewMode } from './lib/markdown';
 
 function getSystemTheme(): ColorTheme {
@@ -14,8 +15,8 @@ export default function App() {
   const [theme, setTheme] = useState<ColorTheme>(getSystemTheme);
   const [notice, setNotice] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const workspaceRef = useRef<HTMLDivElement>(null);
-  const deferredMarkdown = useDeferredValue(markdown);
 
   useEffect(() => {
     if (!notice) return;
@@ -51,6 +52,14 @@ export default function App() {
     }
   };
 
+  const toggleTask = useCallback((itemOffset: number, checked: boolean, previewSource: string) => {
+    setMarkdown((current) => {
+      // Position offsets belong to the displayed source version, not arbitrary later edits.
+      if (current !== previewSource) return current;
+      return setTaskChecked(current, itemOffset, checked);
+    });
+  }, []);
+
   const copyRaw = async () => {
     try {
       await navigator.clipboard.writeText(markdown);
@@ -67,10 +76,10 @@ export default function App() {
   };
 
   const editor = <MarkdownEditor value={markdown} onChange={setMarkdown} theme={theme} />;
-  const preview = <MarkdownPreview markdown={deferredMarkdown} theme={theme} />;
+  const preview = <MarkdownPreview markdown={markdown} theme={theme} onToggleTask={toggleTask} />;
 
   return (
-    <div className="app" data-theme={theme}>
+    <div className="app" data-theme={theme} data-maximized={isMaximized ? 'true' : undefined}>
       <header className="app-header">
         <div className="brand" aria-label="MarkView home">
           <div className="brand-symbol">M<span>↗</span></div>
@@ -91,41 +100,52 @@ export default function App() {
         </div>
 
         <div className="workspace-shell" ref={workspaceRef}>
-        <div className="toolbar">
-          <div className="mode-switch" role="group" aria-label="View mode">
-            {(['editor', 'split', 'preview'] as const).map((item) => (
-              <button key={item} type="button" aria-pressed={mode === item} className={mode === item ? 'mode-button active' : 'mode-button'} onClick={() => setMode(item)}>
-                {item === 'editor' ? '✎ Editor' : item === 'split' ? '◫ Split' : '▤ Preview'}
+          <div className="toolbar">
+            <div className="mode-switch" role="group" aria-label="View mode">
+              {(['editor', 'split', 'preview'] as const).map((item) => (
+                <button key={item} type="button" aria-pressed={mode === item} className={mode === item ? 'mode-button active' : 'mode-button'} onClick={() => setMode(item)}>
+                  {item === 'editor' ? '✎ Editor' : item === 'split' ? '◫ Split' : '▤ Preview'}
+                </button>
+              ))}
+            </div>
+            <div className="toolbar-actions">
+              <button
+                type="button"
+                className="button subtle-button maximize-button"
+                onClick={() => setIsMaximized((value) => !value)}
+                aria-label={isMaximized ? 'Restore workspace size' : 'Maximize workspace in browser window'}
+                aria-pressed={isMaximized}
+                title={isMaximized ? 'Restore workspace size' : 'Fill browser window (keep tabs visible)'}
+              >
+                <span aria-hidden="true">{isMaximized ? '▢' : '▣'}</span>
+                <span>{isMaximized ? 'Restore' : 'Maximize'}</span>
               </button>
-            ))}
+              <button
+                type="button"
+                className="button subtle-button fullscreen-button"
+                onClick={() => void toggleFullscreen()}
+                aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                aria-pressed={isFullscreen}
+                title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Enter fullscreen'}
+              >
+                <span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span>
+                <span>{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
+              </button>
+              <button type="button" className="button subtle-button" onClick={clearMarkdown} disabled={!markdown}>Clear</button>
+              <button type="button" className="button primary-button" onClick={() => void copyRaw()} title="Copy original Markdown as plain text">⧉ <span>Copy Raw</span></button>
+            </div>
           </div>
-          <div className="toolbar-actions">
-            <button
-              type="button"
-              className="button subtle-button fullscreen-button"
-              onClick={() => void toggleFullscreen()}
-              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-              aria-pressed={isFullscreen}
-              title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Enter fullscreen'}
-            >
-              <span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span>
-              <span>{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
-            </button>
-            <button type="button" className="button subtle-button" onClick={clearMarkdown} disabled={!markdown}>Clear</button>
-            <button type="button" className="button primary-button" onClick={() => void copyRaw()} title="Copy original Markdown as plain text">⧉ <span>Copy Raw</span></button>
-          </div>
-        </div>
 
-        <div className="workspace-frame">
-          {mode === 'split' ? (
-            <SplitLayout editor={editor} preview={preview} />
-          ) : mode === 'editor' ? (
-            <section className="workspace-pane single-pane" aria-label="Editor pane"><div className="pane-heading"><span className="pane-dot" />EDITOR <span className="pane-hint">Markdown</span></div>{editor}</section>
-          ) : (
-            <section className="workspace-pane single-pane" aria-label="Preview pane"><div className="pane-heading"><span className="pane-dot preview-dot" />PREVIEW <span className="pane-hint">GitHub flavored</span></div>{preview}</section>
-          )}
-        </div>
-        <footer className="app-footer"><span>Markdown stays in this tab's memory.</span><span>{markdown.length.toLocaleString()} characters <span className="footer-separator">·</span> {markdown ? markdown.trim().split(/\s+/).length.toLocaleString() : 0} words</span></footer>
+          <div className="workspace-frame">
+            {mode === 'split' ? (
+              <SplitLayout editor={editor} preview={preview} />
+            ) : mode === 'editor' ? (
+              <section className="workspace-pane single-pane" aria-label="Editor pane"><div className="pane-heading"><span className="pane-dot" />EDITOR <span className="pane-hint">Markdown</span></div>{editor}</section>
+            ) : (
+              <section className="workspace-pane single-pane" aria-label="Preview pane"><div className="pane-heading"><span className="pane-dot preview-dot" />PREVIEW <span className="pane-hint">GitHub flavored</span></div>{preview}</section>
+            )}
+          </div>
+          <footer className="app-footer"><span>Markdown stays in this tab's memory.</span><span>{markdown.length.toLocaleString()} characters <span className="footer-separator">·</span> {markdown ? markdown.trim().split(/\s+/).length.toLocaleString() : 0} words</span></footer>
         </div>
       </main>
       {notice && <div className="toast" role="status">{notice}</div>}
