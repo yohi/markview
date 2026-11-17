@@ -2,8 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import MarkdownEditor from './components/MarkdownEditor';
 import MarkdownPreview from './components/MarkdownPreview';
 import SplitLayout from './components/SplitLayout';
+import ExportMenu from './components/ExportMenu';
+import { capturePreviewImage, downloadImage, imageExportFilename } from './lib/image-export';
 import { setTaskChecked } from './lib/task-checkbox';
 import type { ColorTheme, ViewMode } from './lib/markdown';
+
+type ImageFormat = 'png' | 'jpeg';
+type ImageCapture = { markdown: string; theme: ColorTheme };
 
 function getSystemTheme(): ColorTheme {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -17,6 +22,10 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const captureRef = useRef<HTMLDivElement>(null);
+  const exportingRef = useRef(false);
+  const [capture, setCapture] = useState<ImageCapture | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!notice) return;
@@ -75,6 +84,57 @@ export default function App() {
     setNotice('Editor cleared');
   };
 
+
+  const exportImage = (format: ImageFormat, action: 'copy' | 'save') => {
+    if (exportingRef.current || !markdown.trim()) return;
+    // Clipboard.write must be invoked in this click handler; PNG creation can
+    // finish asynchronously through a promised ClipboardItem.
+    if (action === 'copy' && (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined')) {
+      setNotice('Image clipboard is unavailable. Use Save PNG instead.');
+      return;
+    }
+    exportingRef.current = true;
+    setExporting(true);
+    setCapture({ markdown, theme });
+
+    const makeImage = async (): Promise<Blob> => {
+      // Wait for React to mount the temporary, full-height preview.
+      for (let frame = 0; frame < 20; frame++) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        if (captureRef.current) return capturePreviewImage(captureRef.current, format, theme);
+      }
+      throw new Error('Could not prepare the image preview.');
+    };
+    const imagePromise = makeImage();
+    const finish = (message: string) => {
+      exportingRef.current = false;
+      setExporting(false);
+      setCapture(null);
+      setNotice(message);
+    };
+    const fail = (error: unknown) => {
+      finish(error instanceof Error ? 'Export failed: ' + error.message : 'Image export failed.');
+    };
+
+    if (action === 'copy') {
+      try {
+        const item = new ClipboardItem({ 'image/png': imagePromise });
+        void navigator.clipboard.write([item]).then(
+          () => finish('Preview PNG copied'),
+          fail,
+        );
+      } catch (error) {
+        void imagePromise.catch(() => undefined);
+        fail(error);
+      }
+    } else {
+      void imagePromise.then((blob) => {
+        downloadImage(blob, imageExportFilename(format));
+        finish(format === 'png' ? 'PNG saved' : 'JPG saved');
+      }).catch(fail);
+    }
+  };
+
   const editor = <MarkdownEditor value={markdown} onChange={setMarkdown} theme={theme} />;
   const preview = <MarkdownPreview markdown={markdown} theme={theme} onToggleTask={toggleTask} />;
 
@@ -131,6 +191,14 @@ export default function App() {
                 <span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span>
                 <span>{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
               </button>
+              <ExportMenu
+                busy={exporting}
+                disabled={!markdown.trim()}
+                canCopy={typeof ClipboardItem !== 'undefined' && Boolean(navigator.clipboard?.write)}
+                onCopyPng={() => exportImage('png', 'copy')}
+                onSavePng={() => exportImage('png', 'save')}
+                onSaveJpg={() => exportImage('jpeg', 'save')}
+              />
               <button type="button" className="button subtle-button" onClick={clearMarkdown} disabled={!markdown}>Clear</button>
               <button type="button" className="button primary-button" onClick={() => void copyRaw()} title="Copy original Markdown as plain text">⧉ <span>Copy Raw</span></button>
             </div>
@@ -145,6 +213,13 @@ export default function App() {
               <section className="workspace-pane single-pane" aria-label="Preview pane"><div className="pane-heading"><span className="pane-dot preview-dot" />PREVIEW <span className="pane-hint">GitHub flavored</span></div>{preview}</section>
             )}
           </div>
+          {capture && (
+            <div className="export-capture-host" aria-hidden="true">
+              <div className="export-capture-surface" ref={captureRef}>
+                <MarkdownPreview markdown={capture.markdown} theme={capture.theme} onToggleTask={() => undefined} />
+              </div>
+            </div>
+          )}
           <footer className="app-footer"><span>Markdown stays in this tab's memory.</span><span>{markdown.length.toLocaleString()} characters <span className="footer-separator">·</span> {markdown ? markdown.trim().split(/\s+/).length.toLocaleString() : 0} words</span></footer>
         </div>
       </main>

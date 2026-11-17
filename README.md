@@ -8,6 +8,7 @@ A lightweight, temporary Markdown workspace with GitHub Flavored Markdown, Merma
 - GitHub Flavored Markdown (tables, task lists, footnotes, strikethrough)
 - Mermaid fenced blocks (rendered in-browser with strict security mode)
 - One-click **Copy Raw** — copies the original Markdown, not the rendered preview
+- **Export image** — Copy PNG (supported secure browsers), Save PNG or Save JPG for the entire rendered preview, including scrolled-off content. Uses a temporary full-height preview, waits for Mermaid, and never uploads the Markdown.
 - Light / dark themes and responsive layout
 - Larger edge-to-edge workspace and a **Fullscreen** toolbar button (browser fullscreen, with Esc to exit) that retains mode switching and Raw Copy
 - **Maximize** fills the browser tab's available viewport without hiding browser tabs; **Restore** returns to the normal layout
@@ -74,3 +75,9 @@ This is an MVP: no document saving, autosave, cloud sync, authentication, AI cal
 ### Preview task editing
 
 Only checkboxes generated from GFM list items are interactive. The renderer uses the original list-item source position to update exactly one Markdown checkbox marker. If the source has changed since that preview was rendered, an outdated click does not apply. No changes are persisted beyond the current tab. Maximize and browser Fullscreen are independent modes.
+
+### Image export limitations
+
+The **Export** menu creates a PNG/JPG from the entire rendered Preview at 2x resolution, including content outside the visible scroll area. The file uses the current theme and an opaque background. Clipboard copying requires a browser supporting `ClipboardItem` and image `navigator.clipboard.write` in a secure context; choose **Save PNG** if clipboard copying is unavailable. Some browsers may restrict clipboard activation during asynchronous image capture.
+
+Image generation happens in the browser only. External images may fail to embed due to CORS; MarkView reports an error instead of knowingly saving incomplete images. Mermaid diagrams must finish rendering successfully. Very large documents exceeding browser canvas/memory limits are rejected with an error rather than silently truncated. The feature does not add persistence, accounts, or server-side rendering.

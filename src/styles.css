@@ -138,3 +138,19 @@
   overflow:auto;
   overscroll-behavior:contain;
 }
+
+/* Temporary full-document capture; only mounted during image export.
+   The positioned host is NOT the image target, avoiding off-screen offsets
+   being copied into the exported canvas. */
+.export-capture-host{position:fixed;left:-12000px;top:0;width:960px;pointer-events:none;z-index:-1}
+.export-capture-surface{width:960px;background:var(--surface);color:var(--text)}
+.export-capture-surface>.preview-body{display:block;width:100%;height:auto;min-height:0;max-height:none;overflow:visible;flex:none;padding:36px 44px}
+.export-capture-surface .mermaid-diagram{overflow:visible}
+.export-menu{position:relative;display:inline-flex;align-items:center}
+.export-menu>summary{list-style:none;white-space:nowrap;user-select:none}
+.export-menu>summary::-webkit-details-marker{display:none}
+.export-menu>summary:focus-visible{outline:2px solid #62a6ff;outline-offset:2px}
+.export-options{position:absolute;z-index:6;top:calc(100% + 4px);right:0;min-width:150px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px;box-shadow:0 8px 24px #0002}
+.export-options button{display:block;width:100%;border:0;background:transparent;color:var(--text);text-align:left;padding:10px 12px;font-size:12px;border-radius:5px}
+.export-options button:hover:not(:disabled),.export-options button:focus-visible{background:var(--surface2)}
+@media(max-width:420px){.export-options{right:0}}
