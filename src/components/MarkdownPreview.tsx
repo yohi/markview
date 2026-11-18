@@ -35,6 +35,16 @@ function headingRenderer(Tag: HeadingTag) {
   };
 }
 
+// Keep heading component types stable across theme and task-handler updates.
+const headingComponents = {
+  h1: headingRenderer('h1'),
+  h2: headingRenderer('h2'),
+  h3: headingRenderer('h3'),
+  h4: headingRenderer('h4'),
+  h5: headingRenderer('h5'),
+  h6: headingRenderer('h6'),
+};
+
 export default function MarkdownPreview({ markdown, theme, onToggleTask, onScrollElement }: Props) {
   const sourceRef = useRef(markdown);
   sourceRef.current = markdown;
@@ -43,12 +53,7 @@ export default function MarkdownPreview({ markdown, theme, onToggleTask, onScrol
     a({ children, ...props }) {
       return <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
     },
-    h1: headingRenderer('h1'),
-    h2: headingRenderer('h2'),
-    h3: headingRenderer('h3'),
-    h4: headingRenderer('h4'),
-    h5: headingRenderer('h5'),
-    h6: headingRenderer('h6'),
+    ...headingComponents,
     p({ node, children, ...props }) { return <p {...props} data-source-offset={sourceOffset(node)}>{children}</p>; },
     blockquote({ node, children, ...props }) { return <blockquote {...props} data-source-offset={sourceOffset(node)}>{children}</blockquote>; },
     ul({ node, children, ...props }) { return <ul {...props} data-source-offset={sourceOffset(node)}>{children}</ul>; },
