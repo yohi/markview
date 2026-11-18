@@ -13,6 +13,9 @@ A lightweight, temporary Markdown workspace with GitHub Flavored Markdown, Merma
 - Larger edge-to-edge workspace and a **Fullscreen** toolbar button (browser fullscreen, with Esc to exit) that retains mode switching and Raw Copy
 - **Maximize** fills the browser tab's available viewport without hiding browser tabs; **Restore** returns to the normal layout
 - Click GFM task checkboxes in Preview to toggle them; the corresponding `[ ]` / `[x]` in the in-memory Markdown source updates immediately, including in Split mode
+- **Open Markdown** — import a local UTF-8 .md/.markdown file (up to 5 MiB) using the toolbar or drag-and-drop, with confirmation before replacing text
+- **Document outline** — collapsible sidebar generated from real Markdown headings; click a heading to navigate in the editor and preview
+- **Scroll sync** — optional bidirectional Editor/Preview anchor-based scrolling in Split mode (off by default on narrow screens)
 - **No saving, accounts or backend.** Content stays in React memory only and is lost on refresh or closing the tab
 
 ## Local development
