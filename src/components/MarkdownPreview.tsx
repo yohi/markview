@@ -1,4 +1,5 @@
 import { createContext, isValidElement, useContext, useMemo, useRef } from 'react';
+import type { ComponentProps } from 'react';
 import type { Components } from 'react-markdown';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -22,6 +23,18 @@ function sourceOffset(node: { position?: { start?: { offset?: number } } } | nul
   return node?.position?.start?.offset;
 }
 
+type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+type HeadingProps = ComponentProps<'h1'> & {
+  node?: { position?: { start?: { offset?: number } } };
+};
+
+function headingRenderer(Tag: HeadingTag) {
+  return ({ node, children, ...props }: HeadingProps) => {
+    const offset = sourceOffset(node);
+    return <Tag {...props} data-source-offset={offset} data-heading-offset={offset}>{children}</Tag>;
+  };
+}
+
 export default function MarkdownPreview({ markdown, theme, onToggleTask, onScrollElement }: Props) {
   const sourceRef = useRef(markdown);
   sourceRef.current = markdown;
@@ -30,12 +43,12 @@ export default function MarkdownPreview({ markdown, theme, onToggleTask, onScrol
     a({ children, ...props }) {
       return <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
     },
-    h1({ node, children, ...props }) { const offset = sourceOffset(node); return <h1 {...props} data-source-offset={offset} data-heading-offset={offset}>{children}</h1>; },
-    h2({ node, children, ...props }) { const offset = sourceOffset(node); return <h2 {...props} data-source-offset={offset} data-heading-offset={offset}>{children}</h2>; },
-    h3({ node, children, ...props }) { const offset = sourceOffset(node); return <h3 {...props} data-source-offset={offset} data-heading-offset={offset}>{children}</h3>; },
-    h4({ node, children, ...props }) { const offset = sourceOffset(node); return <h4 {...props} data-source-offset={offset} data-heading-offset={offset}>{children}</h4>; },
-    h5({ node, children, ...props }) { const offset = sourceOffset(node); return <h5 {...props} data-source-offset={offset} data-heading-offset={offset}>{children}</h5>; },
-    h6({ node, children, ...props }) { const offset = sourceOffset(node); return <h6 {...props} data-source-offset={offset} data-heading-offset={offset}>{children}</h6>; },
+    h1: headingRenderer('h1'),
+    h2: headingRenderer('h2'),
+    h3: headingRenderer('h3'),
+    h4: headingRenderer('h4'),
+    h5: headingRenderer('h5'),
+    h6: headingRenderer('h6'),
     p({ node, children, ...props }) { return <p {...props} data-source-offset={sourceOffset(node)}>{children}</p>; },
     blockquote({ node, children, ...props }) { return <blockquote {...props} data-source-offset={sourceOffset(node)}>{children}</blockquote>; },
     ul({ node, children, ...props }) { return <ul {...props} data-source-offset={sourceOffset(node)}>{children}</ul>; },

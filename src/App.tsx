@@ -45,7 +45,7 @@ export default function App() {
   );
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   const [previewElement, setPreviewElement] = useState<HTMLDivElement | null>(null);
-  const headings = useMemo(() => extractHeadings(markdown), [markdown]);
+  const headings = useMemo(() => (showOutline ? extractHeadings(markdown) : []), [markdown, showOutline]);
 
   useEffect(() => {
     if (!syncEnabled || mode !== 'split' || !editorView || !previewElement) return;
