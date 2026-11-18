@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DragEvent as ReactDragEvent } from 'react';
+import { EditorView } from '@codemirror/view';
 import MarkdownEditor from './components/MarkdownEditor';
 import MarkdownPreview from './components/MarkdownPreview';
 import SplitLayout from './components/SplitLayout';
 import ExportMenu from './components/ExportMenu';
+import ImportButton from './components/ImportButton';
+import OutlinePanel from './components/OutlinePanel';
+import { readMarkdownFile } from './lib/file-import';
+import { extractHeadings } from './lib/outline';
+import { attachScrollSync } from './lib/scroll-sync';
 import { capturePreviewImage, downloadImage, imageExportFilename } from './lib/image-export';
 import { setTaskChecked } from './lib/task-checkbox';
 import type { ColorTheme, ViewMode } from './lib/markdown';
@@ -26,6 +33,95 @@ export default function App() {
   const exportingRef = useRef(false);
   const [capture, setCapture] = useState<ImageCapture | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importBusyRef = useRef(false);
+  const markdownRef = useRef(markdown);
+  markdownRef.current = markdown;
+  const [dropActive, setDropActive] = useState(false);
+  const dropDepth = useRef(0);
+  const [showOutline, setShowOutline] = useState(false);
+  const [syncEnabled, setSyncEnabled] = useState(
+    () => typeof window === 'undefined' || !window.matchMedia('(max-width: 760px)').matches,
+  );
+  const [editorView, setEditorView] = useState<EditorView | null>(null);
+  const [previewElement, setPreviewElement] = useState<HTMLDivElement | null>(null);
+  const headings = useMemo(() => (showOutline ? extractHeadings(markdown) : []), [markdown, showOutline]);
+
+  useEffect(() => {
+    if (!syncEnabled || mode !== 'split' || !editorView || !previewElement) return;
+    return attachScrollSync(editorView, previewElement);
+  }, [syncEnabled, mode, editorView, previewElement]);
+
+  const importMarkdown = async (file: File) => {
+    if (importBusyRef.current) return;
+    importBusyRef.current = true;
+    setImporting(true);
+    const previous = markdownRef.current;
+    try {
+      const contents = await readMarkdownFile(file);
+      if (markdownRef.current !== previous) {
+        setNotice('Editor changed while reading. Import cancelled.');
+        return;
+      }
+      if (previous && contents !== previous &&
+          !window.confirm('Replace the current Markdown with ' + file.name + '? This cannot be undone after leaving the page.')) {
+        setNotice('Import cancelled');
+        return;
+      }
+      if (markdownRef.current !== previous) {
+        setNotice('Editor changed. Import cancelled.');
+        return;
+      }
+      markdownRef.current = contents;
+      setMarkdown(contents);
+      setNotice('Imported ' + file.name);
+    } catch (error) {
+      setNotice(error instanceof Error ? 'Import failed: ' + error.message : 'Import failed.');
+    } finally {
+      importBusyRef.current = false;
+      setImporting(false);
+    }
+  };
+
+  const onFileDragEnter = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    dropDepth.current++;
+    setDropActive(true);
+  };
+  const onFileDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (event.dataTransfer.types.includes('Files')) event.preventDefault();
+  };
+  const onFileDragLeave = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    dropDepth.current = Math.max(0, dropDepth.current - 1);
+    if (dropDepth.current === 0) setDropActive(false);
+  };
+  const onFileDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    // Capture before CodeMirror's native drop handler can read and insert file text.
+    event.preventDefault();
+    event.stopPropagation();
+    dropDepth.current = 0;
+    setDropActive(false);
+    if (event.dataTransfer.files.length !== 1) {
+      setNotice('Drop exactly one Markdown file.');
+      return;
+    }
+    void importMarkdown(event.dataTransfer.files[0]);
+  };
+
+  const jumpToHeading = (offset: number) => {
+    const anchor = previewElement?.querySelector<HTMLElement>('[data-heading-offset="' + offset + '"]');
+    if (anchor && previewElement) {
+      previewElement.scrollTop += anchor.getBoundingClientRect().top - previewElement.getBoundingClientRect().top - 24;
+    }
+    if (editorView) {
+      editorView.dispatch({
+        effects: EditorView.scrollIntoView(Math.min(offset, editorView.state.doc.length), { y: 'start', yMargin: 24 }),
+      });
+    }
+  };
 
   useEffect(() => {
     if (!notice) return;
@@ -135,8 +231,8 @@ export default function App() {
     }
   };
 
-  const editor = <MarkdownEditor value={markdown} onChange={setMarkdown} theme={theme} />;
-  const preview = <MarkdownPreview markdown={markdown} theme={theme} onToggleTask={toggleTask} />;
+  const editor = <MarkdownEditor value={markdown} onChange={setMarkdown} theme={theme} onReady={setEditorView} />;
+  const preview = <MarkdownPreview markdown={markdown} theme={theme} onToggleTask={toggleTask} onScrollElement={setPreviewElement} />;
 
   return (
     <div className="app" data-theme={theme} data-maximized={isMaximized ? 'true' : undefined}>
@@ -169,6 +265,18 @@ export default function App() {
               ))}
             </div>
             <div className="toolbar-actions">
+              <button type="button" className="button subtle-button" aria-expanded={showOutline}
+                aria-controls="markview-outline" onClick={() => setShowOutline((value) => !value)}>
+                Outline
+              </button>
+              {mode === 'split' && (
+                <button type="button" className="button subtle-button"
+                  aria-pressed={syncEnabled} title="Synchronize editor and preview scrolling"
+                  onClick={() => setSyncEnabled((value) => !value)}>
+                  {syncEnabled ? 'Sync On' : 'Sync Off'}
+                </button>
+              )}
+              <ImportButton disabled={importing} onFile={(file) => { void importMarkdown(file); }} />
               <button
                 type="button"
                 className="button subtle-button maximize-button"
@@ -204,7 +312,9 @@ export default function App() {
             </div>
           </div>
 
-          <div className="workspace-frame">
+          <div className={"workspace-frame" + (dropActive ? " is-file-over" : "")}
+            onDragEnter={onFileDragEnter} onDragOver={onFileDragOver}
+            onDragLeave={onFileDragLeave} onDropCapture={onFileDrop}>
             {mode === 'split' ? (
               <SplitLayout editor={editor} preview={preview} />
             ) : mode === 'editor' ? (
@@ -212,6 +322,12 @@ export default function App() {
             ) : (
               <section className="workspace-pane single-pane" aria-label="Preview pane"><div className="pane-heading"><span className="pane-dot preview-dot" />PREVIEW <span className="pane-hint">GitHub flavored</span></div>{preview}</section>
             )}
+            {showOutline && (
+              <div id="markview-outline">
+                <OutlinePanel headings={headings} onSelect={jumpToHeading} onClose={() => setShowOutline(false)} />
+              </div>
+            )}
+            {dropActive && <div className="import-drop-overlay" aria-hidden="true">Drop a .md or .markdown file to import</div>}
           </div>
           {capture && (
             <div className="export-capture-host" aria-hidden="true">

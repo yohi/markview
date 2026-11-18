@@ -1,4 +1,5 @@
 import { createContext, isValidElement, useContext, useMemo, useRef } from 'react';
+import type { ComponentProps } from 'react';
 import type { Components } from 'react-markdown';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,13 +12,40 @@ interface Props {
   markdown: string;
   theme: ColorTheme;
   onToggleTask: (itemOffset: number, checked: boolean, source: string) => void;
+  onScrollElement?: (element: HTMLDivElement | null) => void;
 }
 
 // remark-gfm generates disabled inputs without source offsets.
 // Their parent list-item carries the original Markdown position.
 const TaskItemOffset = createContext<number | null>(null);
 
-export default function MarkdownPreview({ markdown, theme, onToggleTask }: Props) {
+function sourceOffset(node: { position?: { start?: { offset?: number } } } | null | undefined): number | undefined {
+  return node?.position?.start?.offset;
+}
+
+type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+type HeadingProps = ComponentProps<'h1'> & {
+  node?: { position?: { start?: { offset?: number } } };
+};
+
+function headingRenderer(Tag: HeadingTag) {
+  return ({ node, children, ...props }: HeadingProps) => {
+    const offset = sourceOffset(node);
+    return <Tag {...props} data-source-offset={offset} data-heading-offset={offset}>{children}</Tag>;
+  };
+}
+
+// Keep heading component types stable across theme and task-handler updates.
+const headingComponents = {
+  h1: headingRenderer('h1'),
+  h2: headingRenderer('h2'),
+  h3: headingRenderer('h3'),
+  h4: headingRenderer('h4'),
+  h5: headingRenderer('h5'),
+  h6: headingRenderer('h6'),
+};
+
+export default function MarkdownPreview({ markdown, theme, onToggleTask, onScrollElement }: Props) {
   const sourceRef = useRef(markdown);
   sourceRef.current = markdown;
 
@@ -25,11 +53,18 @@ export default function MarkdownPreview({ markdown, theme, onToggleTask }: Props
     a({ children, ...props }) {
       return <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
     },
+    ...headingComponents,
+    p({ node, children, ...props }) { return <p {...props} data-source-offset={sourceOffset(node)}>{children}</p>; },
+    blockquote({ node, children, ...props }) { return <blockquote {...props} data-source-offset={sourceOffset(node)}>{children}</blockquote>; },
+    ul({ node, children, ...props }) { return <ul {...props} data-source-offset={sourceOffset(node)}>{children}</ul>; },
+    ol({ node, children, ...props }) { return <ol {...props} data-source-offset={sourceOffset(node)}>{children}</ol>; },
+    table({ node, children, ...props }) { return <table {...props} data-source-offset={sourceOffset(node)}>{children}</table>; },
+    hr({ node, ...props }) { return <hr {...props} data-source-offset={sourceOffset(node)} />; },
     li({ node, children, ...props }) {
       const offset = node?.position?.start.offset;
       return (
         <TaskItemOffset.Provider value={typeof offset === 'number' ? offset : null}>
-          <li {...props}>{children}</li>
+          <li {...props} data-source-offset={offset}>{children}</li>
         </TaskItemOffset.Provider>
       );
     },
@@ -59,16 +94,16 @@ export default function MarkdownPreview({ markdown, theme, onToggleTask }: Props
       }
       return <code className={className} {...props}>{children}</code>;
     },
-    pre({ children, ...props }) {
+    pre({ node, children, ...props }) {
       if (isValidElement(children) && children.type === MermaidDiagram) {
-        return children;
+        return <div data-source-offset={sourceOffset(node)}>{children}</div>;
       }
-      return <pre {...props}>{children}</pre>;
+      return <pre {...props} data-source-offset={sourceOffset(node)}>{children}</pre>;
     },
   }), [theme, onToggleTask]);
 
   return (
-    <div className="preview-body markdown-body">
+    <div className="preview-body markdown-body" ref={onScrollElement}>
       {markdown.trim() ? (
         <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={components}>
           {markdown}
