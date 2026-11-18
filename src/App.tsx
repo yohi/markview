@@ -99,7 +99,9 @@ export default function App() {
   };
   const onFileDrop = (event: ReactDragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer.types.includes('Files')) return;
+    // Capture before CodeMirror's native drop handler can read and insert file text.
     event.preventDefault();
+    event.stopPropagation();
     dropDepth.current = 0;
     setDropActive(false);
     if (event.dataTransfer.files.length !== 1) {
@@ -312,7 +314,7 @@ export default function App() {
 
           <div className={"workspace-frame" + (dropActive ? " is-file-over" : "")}
             onDragEnter={onFileDragEnter} onDragOver={onFileDragOver}
-            onDragLeave={onFileDragLeave} onDrop={onFileDrop}>
+            onDragLeave={onFileDragLeave} onDropCapture={onFileDrop}>
             {mode === 'split' ? (
               <SplitLayout editor={editor} preview={preview} />
             ) : mode === 'editor' ? (

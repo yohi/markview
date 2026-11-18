@@ -11,7 +11,8 @@ export function assertMarkdownFile(file: Pick<File, 'name' | 'size'>): void {
 
 export function decodeMarkdownBytes(bytes: ArrayBuffer): string {
   // Fatal decoding prevents broken input from silently replacing source text.
-  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  // Keep source offsets consistent with CodeMirror, which stores line breaks as LF.
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/\r\n?/g, '\n');
 }
 
 export async function readMarkdownFile(file: Pick<File, 'name' | 'size' | 'arrayBuffer'>): Promise<string> {
