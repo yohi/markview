@@ -24,7 +24,7 @@ describe('encodePngTiles', () => {
     expect(view.getUint32(20)).toBe(7);
 
     let offset = 8;
-    const compressed: Uint8Array[] = [];
+    const compressed: Uint8Array<ArrayBuffer>[] = [];
     const types: string[] = [];
     while (offset < bytes.length) {
       const length = view.getUint32(offset);

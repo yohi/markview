@@ -11,7 +11,7 @@ const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, index) => {
   return crc >>> 0;
 });
 
-function pngChunk(name: 'IHDR' | 'IDAT' | 'IEND', data: Uint8Array): Uint8Array {
+function pngChunk(name: 'IHDR' | 'IDAT' | 'IEND', data: Uint8Array): Uint8Array<ArrayBuffer> {
   const chunk = new Uint8Array(data.length + 12);
   const view = new DataView(chunk.buffer);
   view.setUint32(0, data.length);
@@ -58,7 +58,7 @@ export async function encodePngTiles(
   header.setUint32(4, height);
   ihdr[8] = 8; // 8 bits per channel
   ihdr[9] = 6; // RGBA
-  const parts: Uint8Array[] = [PNG_SIGNATURE, pngChunk('IHDR', ihdr)];
+  const parts: Uint8Array<ArrayBuffer>[] = [PNG_SIGNATURE, pngChunk('IHDR', ihdr)];
 
   const compressor = new CompressionStream('deflate'); // PNG IDAT uses zlib-wrapped DEFLATE.
   const writer = compressor.writable.getWriter();
