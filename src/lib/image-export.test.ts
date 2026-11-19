@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertCanvasSize, assertImageSize, imageExportFilename, imageExportScales } from './image-export';
+import { assertCanvasSize, assertImageSize, imageExportFilename, imageExportScales, pngCaptureWindow } from './image-export';
 
 describe('imageExportFilename', () => {
   const at = new Date(2026, 10, 17, 13, 8, 9);
@@ -44,5 +44,25 @@ describe('adaptive full-document export', () => {
     expect(() => assertCanvasSize({ width: 960, height: 9000 }, 960, 9000, 1)).not.toThrow();
     expect(() => assertCanvasSize({ width: 960, height: 3000 }, 960, 9000, 1)).toThrow(/dimensions/);
     expect(() => assertCanvasSize({ width: 0, height: 0 }, 960, 9000, 1)).toThrow(/dimensions/);
+  });
+});
+
+describe('full-resolution PNG capture windows', () => {
+  it('captures the first tile at the native 2x scale with lower overlap', () => {
+    expect(pngCaptureWindow(0, 1536, 9000)).toEqual({
+      top: 0, height: 784, cropTop: 0,
+    });
+  });
+
+  it('includes both overlap margins and crops them before PNG encoding', () => {
+    expect(pngCaptureWindow(1536, 1536, 9000)).toEqual({
+      top: 752, height: 800, cropTop: 32,
+    });
+  });
+
+  it('includes the final rows without extending beyond the document', () => {
+    expect(pngCaptureWindow(17900, 100, 9000)).toEqual({
+      top: 8934, height: 66, cropTop: 32,
+    });
   });
 });
