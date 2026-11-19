@@ -1,4 +1,5 @@
 import { toCanvas } from 'html-to-image';
+import { encodePngTiles } from './png-encoder';
 import type { ColorTheme } from './markdown';
 
 export type ImageFormat = 'png' | 'jpeg';
@@ -8,6 +9,10 @@ const MIN_SCALE = 0.5;
 const MAX_DIMENSION = 16384;
 const MAX_PIXELS = 40_000_000;
 const READY_TIMEOUT_MS = 10_000;
+// PNG retains full 2x output resolution, regardless of document length.
+const PNG_SCALE = 2;
+const PNG_TILE_HEIGHT = 768; // CSS pixels per internal capture
+const PNG_OVERLAP = 16; // anti-aliasing guard around tile boundaries
 
 export function imageExportFilename(format: ImageFormat, now = new Date()): string {
   const two = (n: number) => String(n).padStart(2, '0');
@@ -96,12 +101,88 @@ async function waitForPreview(root: HTMLElement): Promise<void> {
   if (document.fonts) await document.fonts.ready;
 }
 
+/**
+ * The capture window includes an overlap on both sides of an internal tile.
+ * Only the requested rows are encoded, preserving exact output dimensions.
+ */
+export function pngCaptureWindow(top: number, rows: number, documentHeight: number): {
+  top: number; height: number; cropTop: number;
+} {
+  const sourceTop = top / PNG_SCALE;
+  const sourceBottom = (top + rows) / PNG_SCALE;
+  const captureTop = Math.max(0, sourceTop - PNG_OVERLAP);
+  const captureBottom = Math.min(documentHeight, sourceBottom + PNG_OVERLAP);
+  return {
+    top: captureTop,
+    height: captureBottom - captureTop,
+    cropTop: (sourceTop - captureTop) * PNG_SCALE,
+  };
+}
+
+/** Render full-resolution strips and encode them into ONE PNG, without a giant canvas. */
+async function captureFullResolutionPng(
+  surface: HTMLElement, theme: ColorTheme, width: number, height: number,
+): Promise<Blob> {
+  const pngWidth = width * PNG_SCALE;
+  const pngHeight = height * PNG_SCALE;
+  if (!Number.isSafeInteger(pngWidth) || pngWidth > MAX_DIMENSION) {
+    throw new Error('Preview is too wide for full-resolution PNG rendering. Nothing was cropped or saved.');
+  }
+  const preview = surface.querySelector<HTMLElement>(':scope > .preview-body');
+  if (!preview) throw new Error('Could not find the full Markdown preview for PNG export.');
+  const oldTransform = preview.style.transform;
+  const backgroundColor = theme === 'dark' ? '#151c28' : '#ffffff';
+
+  try {
+    return await encodePngTiles(pngWidth, pngHeight, PNG_TILE_HEIGHT * PNG_SCALE, async (top, rows) => {
+      const window = pngCaptureWindow(top, rows, height);
+      // Only the temporary, off-screen export preview is moved. No user content is altered.
+      preview.style.transform = `translateY(-${window.top}px)`;
+      let imageLoadError = false;
+      let canvas: HTMLCanvasElement | undefined;
+      try {
+        canvas = await toCanvas(surface, {
+          width,
+          height: window.height,
+          pixelRatio: PNG_SCALE,
+          backgroundColor,
+          skipAutoScale: true,
+          style: { overflow: 'hidden' },
+          onImageErrorHandler: () => { imageLoadError = true; },
+        });
+        if (imageLoadError) {
+          throw new Error('An external preview image could not be embedded (CORS or network error).');
+        }
+        if (canvas.width !== pngWidth || canvas.height !== window.height * PNG_SCALE) {
+          throw new Error('Browser changed a PNG tile dimension. Nothing was cropped or saved.');
+        }
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Browser could not read the PNG tile.');
+        // Read only the interior, excluding overlap. The encoder validates every row.
+        const rgba = context.getImageData(0, window.cropTop, pngWidth, rows).data;
+        return { width: pngWidth, height: rows, rgba };
+      } finally {
+        if (canvas) {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+      }
+    });
+  } finally {
+    preview.style.transform = oldTransform;
+  }
+}
+
 export async function capturePreviewImage(
   surface: HTMLElement, format: ImageFormat, theme: ColorTheme,
 ): Promise<Blob> {
   await waitForPreview(surface);
   const width = Math.ceil(surface.scrollWidth);
   const height = Math.ceil(surface.scrollHeight);
+  if (format === 'png') {
+    return captureFullResolutionPng(surface, theme, width, height);
+  }
+  // JPEG remains on the existing adaptive-resolution canvas path.
   const scales = imageExportScales(width, height);
   const backgroundColor = theme === 'dark' ? '#151c28' : '#ffffff';
   const type = format === 'jpeg' ? 'image/jpeg' : 'image/png';
