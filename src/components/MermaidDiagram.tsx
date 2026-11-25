@@ -1,24 +1,25 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ColorTheme } from '../lib/markdown';
+import { mermaidConfig, intrinsicDiagramWidth } from '../lib/mermaid-config';
+import type { MermaidMode } from '../lib/mermaid-config';
+import MermaidViewport from './MermaidViewport';
+import { sanitizeMermaidSvg } from '../lib/mermaid-svg';
 
 type RenderState =
   | { status: 'loading' }
-  | { status: 'success'; svg: string }
+  | { status: 'success'; svg: SVGSVGElement; width: number }
   | { status: 'error'; message: string };
 
 let renderQueue: Promise<unknown> = Promise.resolve();
 
-function renderSafely(source: string, theme: ColorTheme, id: string): Promise<string> {
+function renderSafely(source: string, theme: ColorTheme, mode: MermaidMode, id: string): Promise<{ svg: SVGSVGElement; width: number }> {
   const job = renderQueue.then(async () => {
     const { default: mermaid } = await import('mermaid');
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      theme: theme === 'dark' ? 'dark' : 'default',
-    });
-    await mermaid.parse(source);
+    // initialize + render must remain atomic because Mermaid configuration is global.
+    mermaid.initialize(mermaidConfig(theme, mode));
     const { svg } = await mermaid.render(id, source);
-    return svg;
+    const root = await sanitizeMermaidSvg(svg);
+    return { svg: root, width: intrinsicDiagramWidth(root.getAttribute('viewBox'), root.getAttribute('width')) };
   });
   renderQueue = job.then(() => undefined, () => undefined);
   return job;
@@ -27,9 +28,11 @@ function renderSafely(source: string, theme: ColorTheme, id: string): Promise<st
 interface Props {
   source: string;
   theme: ColorTheme;
+  mode: MermaidMode;
+  capture?: boolean;
 }
 
-export default function MermaidDiagram({ source, theme }: Props) {
+export default function MermaidDiagram({ source, theme, mode, capture = false }: Props) {
   const stableId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const sequence = useRef(0);
   const [state, setState] = useState<RenderState>({ status: 'loading' });
@@ -39,9 +42,9 @@ export default function MermaidDiagram({ source, theme }: Props) {
     setState({ status: 'loading' });
     const timeout = window.setTimeout(() => {
       const id = 'markview-mermaid-' + stableId + '-' + (++sequence.current);
-      void renderSafely(source, theme, id).then(
-        (svg) => {
-          if (!cancelled) setState({ status: 'success', svg });
+      void renderSafely(source, theme, mode, id).then(
+        (result) => {
+          if (!cancelled) setState({ status: 'success', ...result });
         },
         (error: unknown) => {
           if (!cancelled) setState({
@@ -56,7 +59,7 @@ export default function MermaidDiagram({ source, theme }: Props) {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [source, theme, stableId]);
+  }, [source, theme, mode, stableId]);
 
   if (state.status === 'loading') {
     return <div className="mermaid-status" role="status">Rendering Mermaid diagram…</div>;
@@ -73,6 +76,5 @@ export default function MermaidDiagram({ source, theme }: Props) {
       </div>
     );
   }
-  // Mermaid renders sanitized SVG with securityLevel: strict (no interactive links or HTML).
-  return <div className="mermaid-diagram" role="img" aria-label="Mermaid diagram" dangerouslySetInnerHTML={{ __html: state.svg }} />;
+  return <MermaidViewport svg={state.svg} width={state.width} capture={capture} />;
 }

@@ -7,7 +7,7 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -20,3 +20,16 @@ jobs:
         run: npm test
       - name: Typecheck and production build
         run: npm run build
+      - name: Install Chromium
+        run: npm run browser:install -- --with-deps chromium
+      - name: Browser smoke tests
+        run: npm run test:browser
+      - name: Upload browser evidence and resolved lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: markview-browser-evidence
+          path: |
+            test-results/
+            package-lock.json
+          if-no-files-found: ignore
