@@ -15,6 +15,7 @@ const markdown = [
   '---',
   'config:',
   '  layout: dagre',
+  '  htmlLabels: true',
   '  securityLevel: loose',
   '---',
   'flowchart LR',
@@ -46,7 +47,10 @@ test('presets, explicit configuration, Japanese labels, modal and source preserv
   await expect(diagrams(page)).toHaveCount(3, { timeout: 30000 });
   await expect(diagrams(page).first()).toContainText('利用者');
   await expect(diagrams(page).nth(1)).toContainText('Explicit layout');
+  await expect(diagrams(page).nth(1).locator('foreignObject').first()).toBeVisible();
+  await expect(diagrams(page).nth(1).locator('foreignObject').first()).toContainText('Explicit layout');
   await expect(diagrams(page).nth(1).locator('a[href*="example.invalid"]')).toHaveCount(0);
+  await expect(diagrams(page).locator('script, iframe, object, embed, [onload], [onerror], [onclick], [srcdoc]')).toHaveCount(0);
   const enhanced = await diagrams(page).first().getAttribute('viewBox');
   await page.screenshot({ path: info.outputPath('enhanced.png'), fullPage: true });
   await mode.selectOption('standard');
@@ -92,4 +96,24 @@ test('whole-document PNG and JPG export remains available after zoom', async ({ 
     expect(bytes.length).toBeGreaterThan(1000);
     await expect(page.locator('.export-capture-host')).toHaveCount(0);
   }
+});
+
+test('untrusted diagram labels do not execute embedded event handlers', async ({ page }) => {
+  const source = [
+    '~~~mermaid',
+    '---',
+    'config:',
+    '  securityLevel: loose',
+    '  htmlLabels: true',
+    '---',
+    'flowchart TD',
+    "  A[\"Safe <img src='invalid-markview-image' onerror='window.markviewXss=1'> label\"] --> B[Done]",
+    '~~~',
+  ].join('\n');
+  await load(page, source);
+  await expect(diagrams(page)).toHaveCount(1, { timeout: 30000 });
+  await expect(diagrams(page)).toContainText('Safe');
+  await expect(diagrams(page)).toContainText('Done');
+  await expect(diagrams(page).locator('[onerror], [onload], [onclick], script')).toHaveCount(0);
+  expect(await page.evaluate(() => window.markviewXss)).toBeUndefined();
 });

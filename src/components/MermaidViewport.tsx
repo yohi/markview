@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MAX_ZOOM, MIN_ZOOM, stepZoom } from '../lib/mermaid-config';
 import type { MermaidZoom } from '../lib/mermaid-config';
 
 interface Props {
-  svg: string;
+  svg: SVGSVGElement;
   width: number;
   capture: boolean;
 }
@@ -15,6 +15,12 @@ export default function MermaidViewport({ svg, width, capture }: Props) {
   const expandRef = useRef<HTMLButtonElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef(false);
+
+  // Attach only the sanitized DOM tree; no HTML string is interpreted here.
+  // A fresh clone is needed when React moves between inline and modal views.
+  const mountSvg = useCallback((element: HTMLDivElement | null) => {
+    if (element) element.replaceChildren(svg.cloneNode(true));
+  }, [svg]);
 
   useEffect(() => {
     if (expanded && dialogRef.current && !dialogRef.current.open) {
@@ -50,7 +56,7 @@ export default function MermaidViewport({ svg, width, capture }: Props) {
     <div ref={viewportRef} className="mermaid-diagram" tabIndex={capture ? undefined : 0} aria-label={capture ? undefined : 'Scrollable Mermaid diagram'}>
       <div className="mermaid-svg" role="img" aria-label="Mermaid diagram"
         style={{ width: width * (capture || zoom === 'fit' ? 1 : zoom / 100), maxWidth: capture || zoom === 'fit' ? '100%' : 'none' }}
-        dangerouslySetInnerHTML={{ __html: svg }} />
+        ref={mountSvg} />
     </div>
   );
 

@@ -3,27 +3,23 @@ import type { ColorTheme } from '../lib/markdown';
 import { mermaidConfig, intrinsicDiagramWidth } from '../lib/mermaid-config';
 import type { MermaidMode } from '../lib/mermaid-config';
 import MermaidViewport from './MermaidViewport';
+import { sanitizeMermaidSvg } from '../lib/mermaid-svg';
 
 type RenderState =
   | { status: 'loading' }
-  | { status: 'success'; svg: string; width: number }
+  | { status: 'success'; svg: SVGSVGElement; width: number }
   | { status: 'error'; message: string };
 
 let renderQueue: Promise<unknown> = Promise.resolve();
 
-function renderSafely(source: string, theme: ColorTheme, mode: MermaidMode, id: string): Promise<{ svg: string; width: number }> {
+function renderSafely(source: string, theme: ColorTheme, mode: MermaidMode, id: string): Promise<{ svg: SVGSVGElement; width: number }> {
   const job = renderQueue.then(async () => {
     const { default: mermaid } = await import('mermaid');
     // initialize + render must remain atomic because Mermaid configuration is global.
     mermaid.initialize(mermaidConfig(theme, mode));
     const { svg } = await mermaid.render(id, source);
-    // Parse in an inert template, using the same HTML/SVG parsing rules as
-    // the display path (Mermaid can contain HTML labels inside foreignObject).
-    const template = document.createElement('template');
-    template.innerHTML = svg;
-    const root = template.content.querySelector('svg');
-    if (!root) throw new Error('Invalid Mermaid SVG');
-    return { svg, width: intrinsicDiagramWidth(root.getAttribute('viewBox'), root.getAttribute('width')) };
+    const root = await sanitizeMermaidSvg(svg);
+    return { svg: root, width: intrinsicDiagramWidth(root.getAttribute('viewBox'), root.getAttribute('width')) };
   });
   renderQueue = job.then(() => undefined, () => undefined);
   return job;
