@@ -65,6 +65,7 @@ test('presets, explicit configuration, Japanese labels, modal and source preserv
   await expect(modal.locator('svg').first()).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(modal).toHaveCount(0);
+  await expect(viewer.getByRole('button', { name: 'Expand diagram' })).toBeFocused();
   await page.getByRole('button', { name: 'Toggle theme' }).click();
   await expect(diagrams(page)).toHaveCount(3, { timeout: 30000 });
   await page.getByRole('button', { name: 'Copy Raw' }).click();

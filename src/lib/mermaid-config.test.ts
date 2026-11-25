@@ -35,5 +35,7 @@ describe('Mermaid viewport sizing', () => {
     expect(stepZoom('fit', -1)).toBe(75);
     expect(stepZoom(200, 1)).toBe(200);
     expect(stepZoom(25, -1)).toBe(25);
+    expect(stepZoom('fit', 1, 63)).toBe(75);
+    expect(stepZoom('fit', -1, 63)).toBe(50);
   });
 });

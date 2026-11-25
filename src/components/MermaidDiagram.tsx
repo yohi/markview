@@ -17,8 +17,12 @@ function renderSafely(source: string, theme: ColorTheme, mode: MermaidMode, id: 
     // initialize + render must remain atomic because Mermaid configuration is global.
     mermaid.initialize(mermaidConfig(theme, mode));
     const { svg } = await mermaid.render(id, source);
-    const root = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
-    if (root.localName !== 'svg') throw new Error('Invalid Mermaid SVG');
+    // Parse in an inert template, using the same HTML/SVG parsing rules as
+    // the display path (Mermaid can contain HTML labels inside foreignObject).
+    const template = document.createElement('template');
+    template.innerHTML = svg;
+    const root = template.content.querySelector('svg');
+    if (!root) throw new Error('Invalid Mermaid SVG');
     return { svg, width: intrinsicDiagramWidth(root.getAttribute('viewBox'), root.getAttribute('width')) };
   });
   renderQueue = job.then(() => undefined, () => undefined);

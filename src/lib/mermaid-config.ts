@@ -43,8 +43,12 @@ export function mermaidConfig(theme: ColorTheme, mode: MermaidMode): MermaidConf
 export type MermaidZoom = 'fit' | number;
 export const MIN_ZOOM = 25;
 export const MAX_ZOOM = 200;
-export function stepZoom(zoom: MermaidZoom, direction: -1 | 1): number {
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, (zoom === 'fit' ? 100 : zoom) + direction * 25));
+export function stepZoom(zoom: MermaidZoom, direction: -1 | 1, fitPercent = 100): number {
+  const current = zoom === 'fit' ? fitPercent : zoom;
+  const next = direction === 1
+    ? (Math.floor(current / 25) + 1) * 25
+    : (Math.ceil(current / 25) - 1) * 25;
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
 }
 
 // Mermaid SVGs normally have a viewBox; use a finite width even for unusual diagram types.
