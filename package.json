@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run src",
     "typecheck": "tsc --noEmit",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "browser:install": "playwright install"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.3.0",

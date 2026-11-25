@@ -30,7 +30,7 @@ npm test
 npm run build
 npm run preview
 # Optional local browser smoke tests (build first)
-npx playwright install chromium
+npm run browser:install -- chromium
 npm run test:browser
 ~~~
 
