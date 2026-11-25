@@ -38,7 +38,14 @@ export default function MermaidViewport({ svg, width, capture }: Props) {
   const adjustZoom = (direction: -1 | 1) => {
     const available = viewportRef.current?.clientWidth || width;
     const fitPercent = Math.min(100, available / width * 100);
-    setZoom(current => stepZoom(current, direction, fitPercent));
+    setZoom(current => {
+      // Fit can be smaller than the minimum explicit zoom. Do not enlarge
+      // the diagram or leave responsive Fit mode when asked to zoom out.
+      if (current === 'fit' && direction === -1 && fitPercent <= MIN_ZOOM) {
+        return current;
+      }
+      return stepZoom(current, direction, fitPercent);
+    });
   };
   const toolbar = (
     <div className="mermaid-controls" role="group" aria-label="Mermaid zoom">

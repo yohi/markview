@@ -118,3 +118,50 @@ test('untrusted diagram labels do not execute embedded event handlers', async ({
   await expect(diagrams(page).locator('[onerror], [onload], [onclick], script')).toHaveCount(0);
   expect(await page.evaluate(() => window.markviewXss)).toBeUndefined();
 });
+
+test('zoom out from Fit never enlarges a diagram below the explicit minimum', async ({ page }) => {
+  // A wide real diagram lets us set exact viewport-to-intrinsic-width ratios
+  // without mocking the zoom logic or depending on a particular screen size.
+  const source = [
+    '~~~mermaid',
+    'flowchart LR',
+    ...Array.from({ length: 12 }, (_, i) => '  N' + i + '[Service ' + i + '] --> N' + (i + 1)),
+    '~~~',
+  ].join('\n');
+  await load(page, source);
+  await expect(diagrams(page)).toHaveCount(1, { timeout: 30000 });
+  const viewer = page.locator('.mermaid-viewer').first();
+  const viewport = viewer.locator('.mermaid-diagram');
+  const diagram = viewer.locator('.mermaid-svg');
+  const fit = viewer.getByRole('button', { name: 'Fit width' });
+  const zoomOut = viewer.getByRole('button', { name: 'Zoom out' });
+  await expect(fit).toHaveAttribute('aria-pressed', 'true');
+
+  const intrinsic = await diagram.evaluate(element => Number.parseFloat(element.style.width));
+  expect(intrinsic).toBeGreaterThan(400);
+  for (const percent of [20, 25, 63]) {
+    await fit.click();
+    // Set only the test viewport width. Flooring the pixel value ensures
+    // the actual 25% boundary is not rounded upward by clientWidth.
+    const pixels = Math.floor(intrinsic * percent / 100);
+    await viewport.evaluate((element, width) => {
+      element.style.width = width + 'px';
+      element.style.maxWidth = 'none';
+    }, pixels);
+    const effective = await viewport.evaluate((element, naturalWidth) =>
+      element.clientWidth / naturalWidth * 100, intrinsic);
+    expect(effective).toBeCloseTo(percent, 0);
+    if (percent <= 25) expect(effective).toBeLessThanOrEqual(25);
+    const before = await diagram.evaluate(element => element.getBoundingClientRect().width);
+    await zoomOut.click();
+    if (percent <= 25) {
+      await expect(fit).toHaveAttribute('aria-pressed', 'true');
+      await expect(viewer.getByText('Fit', { exact: true })).toBeVisible();
+      expect(await diagram.evaluate(element => element.getBoundingClientRect().width)).toBeCloseTo(before, 1);
+    } else {
+      await expect(fit).toHaveAttribute('aria-pressed', 'false');
+      await expect(viewer.getByText('50%', { exact: true })).toBeVisible();
+      expect(await diagram.evaluate(element => element.getBoundingClientRect().width)).toBeCloseTo(intrinsic / 2, 1);
+    }
+  }
+});
