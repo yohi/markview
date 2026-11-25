@@ -47,8 +47,9 @@ test('presets, explicit configuration, Japanese labels, modal and source preserv
   await expect(diagrams(page)).toHaveCount(3, { timeout: 30000 });
   await expect(diagrams(page).first()).toContainText('利用者');
   await expect(diagrams(page).nth(1)).toContainText('Explicit layout');
-  await expect(diagrams(page).nth(1).locator('foreignObject').first()).toBeVisible();
-  await expect(diagrams(page).nth(1).locator('foreignObject').first()).toContainText('Explicit layout');
+  const explicitLabel = diagrams(page).nth(1).locator('foreignObject').filter({ hasText: 'Explicit layout' });
+  await expect(explicitLabel).toHaveCount(1);
+  await expect(explicitLabel).toBeVisible();
   await expect(diagrams(page).nth(1).locator('a[href*="example.invalid"]')).toHaveCount(0);
   await expect(diagrams(page).locator('script, iframe, object, embed, [onload], [onerror], [onclick], [srcdoc]')).toHaveCount(0);
   const enhanced = await diagrams(page).first().getAttribute('viewBox');
