@@ -10,6 +10,9 @@ export async function sanitizeMermaidSvg(markup: string): Promise<SVGSVGElement>
   const fragment = DOMPurify.sanitize(markup, {
     RETURN_DOM_FRAGMENT: true,
     ADD_TAGS: ['foreignObject'],
+    // Keep the default MathML integration point and explicitly enable SVG
+    // HTML labels; namespace and element/attribute checks remain enabled.
+    HTML_INTEGRATION_POINTS: { 'annotation-xml': true, foreignobject: true },
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input',
       'button', 'textarea', 'select', 'link', 'meta', 'base', 'template'],
     FORBID_ATTR: ['srcdoc'],
