@@ -7,10 +7,13 @@ import rehypeSanitize from 'rehype-sanitize';
 import MermaidDiagram from './MermaidDiagram';
 import { cleanCodeBlock, isMermaidCode } from '../lib/markdown';
 import type { ColorTheme } from '../lib/markdown';
+import type { MermaidMode } from '../lib/mermaid-config';
 
 interface Props {
   markdown: string;
   theme: ColorTheme;
+  mermaidMode: MermaidMode;
+  capture?: boolean;
   onToggleTask: (itemOffset: number, checked: boolean, source: string) => void;
   onScrollElement?: (element: HTMLDivElement | null) => void;
 }
@@ -45,7 +48,7 @@ const headingComponents = {
   h6: headingRenderer('h6'),
 };
 
-export default function MarkdownPreview({ markdown, theme, onToggleTask, onScrollElement }: Props) {
+export default function MarkdownPreview({ markdown, theme, mermaidMode, capture = false, onToggleTask, onScrollElement }: Props) {
   const sourceRef = useRef(markdown);
   sourceRef.current = markdown;
 
@@ -90,7 +93,7 @@ export default function MarkdownPreview({ markdown, theme, onToggleTask, onScrol
     },
     code({ className, children, ...props }) {
       if (isMermaidCode(className)) {
-        return <MermaidDiagram source={cleanCodeBlock(String(children))} theme={theme} />;
+        return <MermaidDiagram source={cleanCodeBlock(String(children))} theme={theme} mode={mermaidMode} capture={capture} />;
       }
       return <code className={className} {...props}>{children}</code>;
     },
@@ -100,7 +103,7 @@ export default function MarkdownPreview({ markdown, theme, onToggleTask, onScrol
       }
       return <pre {...props} data-source-offset={sourceOffset(node)}>{children}</pre>;
     },
-  }), [theme, onToggleTask]);
+  }), [theme, mermaidMode, capture, onToggleTask]);
 
   return (
     <div className="preview-body markdown-body" ref={onScrollElement}>

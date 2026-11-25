@@ -13,9 +13,11 @@ import { attachScrollSync } from './lib/scroll-sync';
 import { capturePreviewImage, downloadImage, imageExportFilename } from './lib/image-export';
 import { setTaskChecked } from './lib/task-checkbox';
 import type { ColorTheme, ViewMode } from './lib/markdown';
+import { DEFAULT_MERMAID_MODE } from './lib/mermaid-config';
+import type { MermaidMode } from './lib/mermaid-config';
 
 type ImageFormat = 'png' | 'jpeg';
-type ImageCapture = { markdown: string; theme: ColorTheme };
+type ImageCapture = { markdown: string; theme: ColorTheme; mermaidMode: MermaidMode };
 
 function getSystemTheme(): ColorTheme {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -25,6 +27,7 @@ export default function App() {
   const [markdown, setMarkdown] = useState('');
   const [mode, setMode] = useState<ViewMode>('split');
   const [theme, setTheme] = useState<ColorTheme>(getSystemTheme);
+  const [mermaidMode, setMermaidMode] = useState<MermaidMode>(DEFAULT_MERMAID_MODE);
   const [notice, setNotice] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -191,7 +194,7 @@ export default function App() {
     }
     exportingRef.current = true;
     setExporting(true);
-    setCapture({ markdown, theme });
+    setCapture({ markdown, theme, mermaidMode });
 
     const makeImage = async (): Promise<Blob> => {
       // Wait for React to mount the temporary, full-height preview.
@@ -232,7 +235,7 @@ export default function App() {
   };
 
   const editor = <MarkdownEditor value={markdown} onChange={setMarkdown} theme={theme} onReady={setEditorView} />;
-  const preview = <MarkdownPreview markdown={markdown} theme={theme} onToggleTask={toggleTask} onScrollElement={setPreviewElement} />;
+  const preview = <MarkdownPreview markdown={markdown} theme={theme} mermaidMode={mermaidMode} onToggleTask={toggleTask} onScrollElement={setPreviewElement} />;
 
   return (
     <div className="app" data-theme={theme} data-maximized={isMaximized ? 'true' : undefined}>
@@ -243,7 +246,7 @@ export default function App() {
         </div>
         <div className="header-actions">
           <span className="ephemeral-note"><span className="status-indicator" /> No saving · Browser only</span>
-          <button type="button" className="icon-button theme-button" title="Toggle theme" aria-label="Toggle theme" onClick={() => setTheme((prev) => prev === 'dark' ? 'light' : 'dark')}>
+          <button type="button" className="icon-button theme-button" title="Toggle theme" aria-label="Toggle theme" disabled={exporting} onClick={() => setTheme((prev) => prev === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? '☀' : '☾'}
           </button>
         </div>
@@ -265,6 +268,14 @@ export default function App() {
               ))}
             </div>
             <div className="toolbar-actions">
+              <label className="mermaid-mode-label">
+                Mermaid
+                <select aria-label="Mermaid rendering mode" value={mermaidMode} disabled={exporting}
+                  onChange={(event) => setMermaidMode(event.target.value === 'standard' ? 'standard' : 'enhanced')}>
+                  <option value="enhanced">Enhanced</option>
+                  <option value="standard">Standard</option>
+                </select>
+              </label>
               <button type="button" className="button subtle-button" aria-expanded={showOutline}
                 aria-controls="markview-outline" onClick={() => setShowOutline((value) => !value)}>
                 Outline
@@ -332,7 +343,7 @@ export default function App() {
           {capture && (
             <div className="export-capture-host" aria-hidden="true">
               <div className="export-capture-surface" ref={captureRef}>
-                <MarkdownPreview markdown={capture.markdown} theme={capture.theme} onToggleTask={() => undefined} />
+                <MarkdownPreview markdown={capture.markdown} theme={capture.theme} mermaidMode={capture.mermaidMode} capture onToggleTask={() => undefined} />
               </div>
             </div>
           )}

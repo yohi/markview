@@ -1,0 +1,67 @@
+import { useEffect, useRef, useState } from 'react';
+import { MAX_ZOOM, MIN_ZOOM, stepZoom } from '../lib/mermaid-config';
+import type { MermaidZoom } from '../lib/mermaid-config';
+
+interface Props {
+  svg: string;
+  width: number;
+  capture: boolean;
+}
+
+export default function MermaidViewport({ svg, width, capture }: Props) {
+  const [zoom, setZoom] = useState<MermaidZoom>('fit');
+  const [expanded, setExpanded] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const expandRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (expanded && dialogRef.current && !dialogRef.current.open) {
+      dialogRef.current.showModal();
+    }
+  }, [expanded]);
+
+  const close = () => {
+    setExpanded(false);
+    expandRef.current?.focus();
+  };
+  const toolbar = (
+    <div className="mermaid-controls" role="group" aria-label="Mermaid zoom">
+      <button type="button" aria-label="Zoom out" disabled={zoom === MIN_ZOOM} onClick={() => setZoom(z => stepZoom(z, -1))}>−</button>
+      <span aria-live="polite">{zoom === 'fit' ? 'Fit' : zoom + '%'}</span>
+      <button type="button" aria-label="Zoom in" disabled={zoom === MAX_ZOOM} onClick={() => setZoom(z => stepZoom(z, 1))}>+</button>
+      <button type="button" aria-pressed={zoom === 'fit'} onClick={() => setZoom('fit')}>Fit width</button>
+      <button type="button" aria-pressed={zoom === 100} onClick={() => setZoom(100)}>100%</button>
+    </div>
+  );
+
+  // Exactly one copy of the SVG is mounted: duplicating it would duplicate IDs
+  // used by Mermaid's marker, clip-path and style references.
+  const viewport = (
+    <div className="mermaid-diagram" tabIndex={capture ? undefined : 0} aria-label={capture ? undefined : 'Scrollable Mermaid diagram'}>
+      <div className="mermaid-svg" role="img" aria-label="Mermaid diagram"
+        style={{ width: width * (capture || zoom === 'fit' ? 1 : zoom / 100), maxWidth: capture || zoom === 'fit' ? '100%' : 'none' }}
+        dangerouslySetInnerHTML={{ __html: svg }} />
+    </div>
+  );
+
+  if (capture) return viewport;
+  return (
+    <div className="mermaid-viewer">
+      <div className="mermaid-toolbar">
+        {!expanded && toolbar}
+        <button ref={expandRef} type="button" aria-label="Expand diagram" aria-expanded={expanded}
+          disabled={expanded} onClick={() => setExpanded(true)}>⛶ Expand</button>
+      </div>
+      {!expanded && viewport}
+      {expanded && (
+        <dialog className="mermaid-dialog" ref={dialogRef} aria-label="Expanded Mermaid diagram" onClose={close}>
+          <div className="mermaid-toolbar">
+            {toolbar}
+            <button type="button" onClick={() => dialogRef.current?.close()}>Close diagram</button>
+          </div>
+          {viewport}
+        </dialog>
+      )}
+    </div>
+  );
+}

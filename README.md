@@ -6,7 +6,8 @@ A lightweight, temporary Markdown workspace with GitHub Flavored Markdown, Merma
 
 - **Editor / Split / Preview** modes, with a resizable split pane (30–70% on desktop)
 - GitHub Flavored Markdown (tables, task lists, footnotes, strikethrough)
-- Mermaid fenced blocks (rendered in-browser with strict security mode)
+- Mermaid 12.3.0 fenced blocks (rendered in-browser with strict security mode); Enhanced (default, ELK and high-contrast theme) or Standard (Dagre and conventional theme). Both respect supported diagram-local settings except protected security/CSS settings. Standard is not a guarantee of identical GitHub rendering.
+- Diagram controls: Fit width, 100%, 25–200% zoom, scroll and modal expansion (Esc closes). Mode and zoom are temporary; the Markdown source is unchanged. Whole-document exports use the captured theme and mode, fit complete diagrams to the export width, and omit all diagram controls.
 - One-click **Copy Raw** — copies the original Markdown, not the rendered preview
 - **Export image** — Copy PNG (supported secure browsers), Save PNG or Save JPG for the entire rendered preview, including scrolled-off content. Uses a temporary full-height preview, waits for Mermaid, and never uploads the Markdown.
 - Light / dark themes and responsive layout
@@ -28,6 +29,9 @@ npm run dev
 npm test
 npm run build
 npm run preview
+# Optional local browser smoke tests (build first)
+npx playwright install chromium
+npm run test:browser
 ~~~
 
 ## Cloudflare Workers Static Assets
